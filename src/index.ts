@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import * as fs from "fs/promises";
 import { program } from "commander";
 import * as acorn from "acorn";
