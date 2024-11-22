@@ -10,31 +10,85 @@ import glob from "fast-glob";
 import path from "path";
 
 function transformJSXElement(node: any): any {
+  if (node.type !== "JSXElement" && node.type !== "JSXFragment" && node.type !== "JSXExpressionContainer") {
+    for (const key in node) {
+      if (Array.isArray(node[key])) {
+        node[key] = node[key].map((child: any) =>
+          typeof child === "object" && child !== null
+            ? transformJSXElement(child)
+            : child,
+        );
+      } else if (typeof node[key] === "object" && node[key] !== null) {
+        node[key] = transformJSXElement(node[key]);
+      }
+    }
+    return node;
+  }
+
+  if (node.type === "JSXFragment") {
+    return {
+      type: "CallExpression",
+      callee: {
+        type: "MemberExpression",
+        object: { type: "Identifier", name: "React" },
+        property: { type: "Identifier", name: "Fragment" },
+        computed: false,
+      },
+      arguments: [
+        { type: "Literal", value: null },
+        ...node.children.map((child: any) => transformJSXElement(child)),
+      ],
+    };
+  }
+
   if (node.type === "JSXElement") {
     const name = node.openingElement.name.name;
-    const isComponent = name[0] === name[0].toUpperCase();
-    const nameNode = isComponent
-      ? { type: "Identifier", name: name }
-      : { type: "Literal", value: name };
+    const isComponent = name && name[0] === name[0].toUpperCase();
+    
+    const nameNode = node.openingElement.name.type === "JSXMemberExpression"
+      ? transformJSXMemberExpression(node.openingElement.name)
+      : isComponent
+        ? { type: "Identifier", name: name }
+        : { type: "Literal", value: name };
 
-    const props = node.openingElement.attributes.map((attr: any) => ({
-      type: "Property",
-      key: { type: "Identifier", name: attr.name.name },
-      value: attr.value
-        ? transformJSXElement(attr.value)
-        : { type: "Literal", value: true },
-      kind: "init",
-      method: false,
-      shorthand: false,
-      computed: false,
-    }));
+    const props = node.openingElement.attributes.map((attr: any) => {
+      if (attr.type === "JSXSpreadAttribute") {
+        return {
+          type: "SpreadElement",
+          argument: transformJSXElement(attr.argument),
+        };
+      }
 
-    // Transform children
+      const value = attr.value
+        ? attr.value.type === "JSXExpressionContainer"
+          ? transformJSXElement(attr.value.expression)
+          : transformJSXElement(attr.value)
+        : { type: "Literal", value: true };
+
+      return {
+        type: "Property",
+        key: { type: "Identifier", name: attr.name.name },
+        value,
+        kind: "init",
+        method: false,
+        shorthand: false,
+        computed: false,
+      };
+    });
+
     const children = node.children
-      .filter((child: any) => child.type !== "JSXText" || child.value.trim())
+      .filter((child: any) => {
+        if (child.type === "JSXText") {
+          return child.value.trim();
+        }
+        return true;
+      })
       .map((child: any) => {
         if (child.type === "JSXText") {
           return { type: "Literal", value: child.value.trim() };
+        }
+        if (child.type === "JSXExpressionContainer") {
+          return transformJSXElement(child.expression);
         }
         return transformJSXElement(child);
       });
@@ -51,31 +105,30 @@ function transformJSXElement(node: any): any {
         nameNode,
         props.length
           ? {
-              type: "TSAsExpression",
-              expression: { type: "ObjectExpression", properties: props },
-              typeAnnotation: { type: "TSNeverKeyword" },
+              type: "ObjectExpression",
+              properties: props,
             }
           : { type: "Literal", value: null },
         ...children,
       ],
     };
   } else if (node.type === "JSXExpressionContainer") {
-    return node.expression;
-  }
-
-  for (const key in node) {
-    if (Array.isArray(node[key])) {
-      node[key] = node[key].map((child: any) =>
-        typeof child === "object" && child !== null
-          ? transformJSXElement(child)
-          : child,
-      );
-    } else if (typeof node[key] === "object" && node[key] !== null) {
-      node[key] = transformJSXElement(node[key]);
-    }
+    return transformJSXElement(node.expression);
   }
 
   return node;
+}
+
+function transformJSXMemberExpression(node: any): any {
+  if (node.type === "JSXMemberExpression") {
+    return {
+      type: "MemberExpression",
+      object: transformJSXMemberExpression(node.object),
+      property: { type: "Identifier", name: node.property.name },
+      computed: false,
+    };
+  }
+  return { type: "Identifier", name: node.name };
 }
 
 export const tsxToTS = (content: string) => {
