@@ -10,7 +10,11 @@ import glob from "fast-glob";
 import path from "path";
 
 function transformJSXElement(node: any): any {
-  if (node.type !== "JSXElement" && node.type !== "JSXFragment" && node.type !== "JSXExpressionContainer") {
+  if (
+    node.type !== "JSXElement" &&
+    node.type !== "JSXFragment" &&
+    node.type !== "JSXExpressionContainer"
+  ) {
     for (const key in node) {
       if (Array.isArray(node[key])) {
         node[key] = node[key].map((child: any) =>
@@ -44,12 +48,13 @@ function transformJSXElement(node: any): any {
   if (node.type === "JSXElement") {
     const name = node.openingElement.name.name;
     const isComponent = name && name[0] === name[0].toUpperCase();
-    
-    const nameNode = node.openingElement.name.type === "JSXMemberExpression"
-      ? transformJSXMemberExpression(node.openingElement.name)
-      : isComponent
-        ? { type: "Identifier", name: name }
-        : { type: "Literal", value: name };
+
+    const nameNode =
+      node.openingElement.name.type === "JSXMemberExpression"
+        ? transformJSXMemberExpression(node.openingElement.name)
+        : isComponent
+          ? { type: "Identifier", name: name }
+          : { type: "Literal", value: name };
 
     const props = node.openingElement.attributes.map((attr: any) => {
       if (attr.type === "JSXSpreadAttribute") {
@@ -105,8 +110,9 @@ function transformJSXElement(node: any): any {
         nameNode,
         props.length
           ? {
-              type: "ObjectExpression",
-              properties: props,
+              type: "TSAsExpression",
+              expression: { type: "ObjectExpression", properties: props },
+              typeAnnotation: { type: "TSNeverKeyword" },
             }
           : { type: "Literal", value: null },
         ...children,
