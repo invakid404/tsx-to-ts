@@ -1,8 +1,11 @@
 import * as fs from "fs/promises";
+import { program } from "commander";
 import * as acorn from "acorn";
 import { tsPlugin } from "acorn-typescript";
 import jsx from "acorn-jsx";
 import * as astring from "astring";
+import glob from "fast-glob";
+import path from "path";
 
 function transformJSXElement(node: any): any {
   if (node.type === "JSXElement") {
@@ -100,3 +103,18 @@ export const tsxToTS = (content: string) => {
     generator: customGenerator,
   });
 };
+
+program.argument("<input>", "input glob").action(async (input) => {
+  const files = await glob(input);
+  for (const file of files) {
+    const parsedPath = path.parse(file);
+
+    const content = await fs.readFile(file, "utf-8");
+    const transformed = tsxToTS(content);
+
+    const transformedPath = path.join(parsedPath.dir, `${parsedPath.name}.ts`);
+    await fs.writeFile(transformedPath, transformed, "utf-8");
+  }
+});
+
+program.parse();
