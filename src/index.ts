@@ -5,7 +5,7 @@ import { program } from "commander";
 import * as acorn from "acorn";
 import { tsPlugin } from "acorn-typescript";
 import jsx from "acorn-jsx";
-import * as astring from "astring";
+import * as recast from "recast";
 import glob from "fast-glob";
 import path from "path";
 
@@ -105,22 +105,7 @@ export const tsxToTS = (content: string) => {
   const transformedAst = transformJSXElement(root);
   (transformedAst as any).comments = comments;
 
-  const customGenerator = {
-    ...astring.GENERATOR,
-    TSAsExpression: function (node: any, state: any) {
-      (this as any)[node.expression.type](node.expression, state);
-      state.write(" as ");
-      (this as any)[node.typeAnnotation.type](node.typeAnnotation, state);
-    },
-    TSNeverKeyword: function (_node: any, state: any) {
-      state.write("never");
-    },
-  };
-
-  return astring.generate(transformedAst, {
-    generator: customGenerator,
-    comments: true,
-  });
+  return recast.print(transformedAst).code;
 };
 
 program.argument("<input>", "input glob").action(async (input) => {
