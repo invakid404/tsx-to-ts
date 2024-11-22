@@ -79,13 +79,13 @@ function transformJSXElement(node: any): any {
     const children = node.children
       .filter((child: any) => {
         if (child.type === "JSXText") {
-          return child.value.trim();
+          return child.value.trim() !== "";
         }
         return true;
       })
       .map((child: any) => {
         if (child.type === "JSXText") {
-          return { type: "Literal", value: child.value.trim() };
+          return { type: "Literal", value: child.value };
         }
         if (child.type === "JSXExpressionContainer") {
           return transformJSXElement(child.expression);
