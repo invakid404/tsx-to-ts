@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "type": "module",
-  "scripts": {},
+  "scripts": {
+    "build": "rimraf dist/ && tsc"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
