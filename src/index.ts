@@ -79,15 +79,31 @@ function transformJSXElement(node: any): any {
 }
 
 export const tsxToTS = (content: string) => {
+  const comments: Array<{
+    type: "Line" | "Block";
+    value: string;
+    start: number;
+    end: number;
+  }> = [];
+
   const root = acorn.Parser.extend(tsPlugin() as never)
     .extend(jsx())
     .parse(content, {
       sourceType: "module",
       ecmaVersion: "latest",
       locations: true,
+      onComment: (isBlock, text, start, end) => {
+        comments.push({
+          type: isBlock ? "Block" : "Line",
+          value: text,
+          start,
+          end,
+        });
+      },
     });
 
   const transformedAst = transformJSXElement(root);
+  (transformedAst as any).comments = comments;
 
   const customGenerator = {
     ...astring.GENERATOR,
@@ -103,6 +119,7 @@ export const tsxToTS = (content: string) => {
 
   return astring.generate(transformedAst, {
     generator: customGenerator,
+    comments: true,
   });
 };
 
