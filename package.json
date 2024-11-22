@@ -9,7 +9,7 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": [],
-  "author": "",
+  "author": "Tsvetomir Bonev <me@invak.id>",
   "license": "Unlicense",
   "devDependencies": {
     "@types/node": "^22.9.1",
