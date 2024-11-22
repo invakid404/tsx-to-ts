@@ -18,6 +18,7 @@
   "dependencies": {
     "acorn": "^8.14.0",
     "acorn-jsx": "^5.3.2",
-    "acorn-typescript": "^1.4.13"
+    "acorn-typescript": "^1.4.13",
+    "astring": "^1.9.0"
   }
 }
