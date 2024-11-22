@@ -27,7 +27,7 @@ The tool uses:
 
 - `acorn` with TypeScript and JSX plugins for parsing
 - AST transformation to convert JSX elements to `React.createElement` calls
-- `astring` for code generation
+- `recast` for code generation
 
 For example, this TSX:
 
