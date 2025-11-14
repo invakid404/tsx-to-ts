@@ -9,6 +9,42 @@ import * as recast from "recast";
 import glob from "fast-glob";
 import path from "path";
 
+function createReactElementCall(
+  component: any,
+  props: any,
+  children: any[],
+) {
+  return {
+    type: "CallExpression",
+    callee: {
+      type: "MemberExpression",
+      object: { type: "Identifier", name: "React" },
+      property: { type: "Identifier", name: "createElement" },
+      computed: false,
+    },
+    arguments: [component, props, ...children],
+  };
+}
+
+function transformJSXChildren(children: any[]): any[] {
+  return children
+    .filter((child: any) => {
+      if (child.type === "JSXText") {
+        return child.value.trim() !== "";
+      }
+      return true;
+    })
+    .map((child: any) => {
+      if (child.type === "JSXText") {
+        return { type: "Literal", value: child.value };
+      }
+      if (child.type === "JSXExpressionContainer") {
+        return transformJSXElement(child.expression);
+      }
+      return transformJSXElement(child);
+    });
+}
+
 function transformJSXElement(node: any): any {
   if (
     node.type !== "JSXElement" &&
@@ -30,19 +66,18 @@ function transformJSXElement(node: any): any {
   }
 
   if (node.type === "JSXFragment") {
-    return {
-      type: "CallExpression",
-      callee: {
+    const children = transformJSXChildren(node.children);
+
+    return createReactElementCall(
+      {
         type: "MemberExpression",
         object: { type: "Identifier", name: "React" },
         property: { type: "Identifier", name: "Fragment" },
         computed: false,
       },
-      arguments: [
-        { type: "Literal", value: null },
-        ...node.children.map((child: any) => transformJSXElement(child)),
-      ],
-    };
+      { type: "Literal", value: null },
+      children,
+    );
   }
 
   if (node.type === "JSXElement") {
@@ -81,43 +116,19 @@ function transformJSXElement(node: any): any {
       };
     });
 
-    const children = node.children
-      .filter((child: any) => {
-        if (child.type === "JSXText") {
-          return child.value.trim() !== "";
-        }
-        return true;
-      })
-      .map((child: any) => {
-        if (child.type === "JSXText") {
-          return { type: "Literal", value: child.value };
-        }
-        if (child.type === "JSXExpressionContainer") {
-          return transformJSXElement(child.expression);
-        }
-        return transformJSXElement(child);
-      });
+    const children = transformJSXChildren(node.children);
 
-    return {
-      type: "CallExpression",
-      callee: {
-        type: "MemberExpression",
-        object: { type: "Identifier", name: "React" },
-        property: { type: "Identifier", name: "createElement" },
-        computed: false,
-      },
-      arguments: [
-        nameNode,
-        props.length
-          ? {
-              type: "TSAsExpression",
-              expression: { type: "ObjectExpression", properties: props },
-              typeAnnotation: { type: "TSNeverKeyword" },
-            }
-          : { type: "Literal", value: null },
-        ...children,
-      ],
-    };
+    return createReactElementCall(
+      nameNode,
+      props.length
+        ? {
+            type: "TSAsExpression",
+            expression: { type: "ObjectExpression", properties: props },
+            typeAnnotation: { type: "TSNeverKeyword" },
+          }
+        : { type: "Literal", value: null },
+      children,
+    );
   } else if (node.type === "JSXExpressionContainer") {
     return transformJSXElement(node.expression);
   }
