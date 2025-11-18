@@ -18,16 +18,17 @@ npx tsx-to-ts "src/**/*.tsx"
 This will:
 
 1. Find all TSX files matching the glob pattern
-2. Convert JSX syntax to `React.createElement` calls
+2. Convert JSX syntax to React's automatic JSX runtime (`jsx`/`jsxs` functions)
 3. Save new `.ts` files alongside the original `.tsx` files
 
 ## How it Works
 
 The tool uses:
 
-- `acorn` with TypeScript and JSX plugins for parsing
-- AST transformation to convert JSX elements to `React.createElement` calls
-- `recast` for code generation
+- `@babel/core` for code transformation
+- `@babel/plugin-transform-react-jsx` with automatic runtime to convert JSX
+  syntax
+- Babel's TypeScript parser for parsing TSX files
 
 For example, this TSX:
 
@@ -38,9 +39,17 @@ const Button = () => <button type="submit">Click me</button>;
 Gets converted to:
 
 ```typescript
+import { jsx as _jsx } from "react/jsx-runtime";
+
 const Button = () =>
-  React.createElement("button", { type: "submit" } as never, "Click me");
+  _jsx("button", {
+    type: "submit",
+    children: "Click me",
+  });
 ```
+
+The tool uses React's automatic JSX runtime, which transforms JSX elements into
+`jsx` and `jsxs` function calls from `react/jsx-runtime`.
 
 ## Development
 
