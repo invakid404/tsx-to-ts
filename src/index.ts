@@ -9,11 +9,7 @@ import * as recast from "recast";
 import glob from "fast-glob";
 import path from "path";
 
-function createReactElementCall(
-  component: any,
-  props: any,
-  children: any[],
-) {
+function createReactElementCall(component: any, props: any, children: any[]) {
   return {
     type: "CallExpression",
     callee: {
@@ -26,23 +22,64 @@ function createReactElementCall(
   };
 }
 
+function normalizeJSXText(text: string): string | null {
+  // If no newlines (intra-line), preserve as-is (including pure spaces/tabs) unless completely empty
+  if (!text.includes("\n")) {
+    return text !== "" ? text : null;
+  }
+
+  // For multi-line: split by newlines, trim each line explicitly (handles all \s whitespace)
+  const lines = text.split(/\n/);
+  const trimmedLines = lines
+    .map((line) => line.replace(/^\s+|\s+$/g, ""))
+    .filter((line) => line !== "");
+
+  // Join with single space (collapse newlines/multi-spaces)
+  const normalized = trimmedLines.join(" ");
+
+  // Discard if empty after normalization
+  return normalized !== "" ? normalized : null;
+}
+
 function transformJSXChildren(children: any[]): any[] {
-  return children
-    .filter((child: any) => {
-      if (child.type === "JSXText") {
-        return child.value.trim() !== "";
+  // Step 1: Merge adjacent JSXText nodes into chunks
+  const mergedChildren: any[] = [];
+  let currentText = "";
+
+  for (const child of children) {
+    if (child.type === "JSXText") {
+      currentText += child.value;
+    } else {
+      // Flush any pending text before non-text child
+      if (currentText !== "") {
+        const normalized = normalizeJSXText(currentText);
+        if (normalized !== null) {
+          mergedChildren.push({ type: "JSXText", value: normalized });
+        }
+        currentText = "";
       }
-      return true;
-    })
-    .map((child: any) => {
-      if (child.type === "JSXText") {
-        return { type: "Literal", value: child.value };
-      }
-      if (child.type === "JSXExpressionContainer") {
-        return transformJSXElement(child.expression);
-      }
-      return transformJSXElement(child);
-    });
+      mergedChildren.push(child);
+    }
+  }
+
+  // Flush any trailing text
+  if (currentText !== "") {
+    const normalized = normalizeJSXText(currentText);
+    if (normalized !== null) {
+      mergedChildren.push({ type: "JSXText", value: normalized });
+    }
+  }
+
+  // Step 2: Map the merged children to AST nodes (recursively transform non-text)
+  return mergedChildren.map((child: any) => {
+    if (child.type === "JSXText") {
+      return { type: "Literal", value: child.value };
+    }
+    if (child.type === "JSXExpressionContainer") {
+      return transformJSXElement(child.expression);
+    }
+    return transformJSXElement(child);
+  });
 }
 
 function transformJSXElement(node: any): any {
@@ -148,7 +185,7 @@ function transformJSXMemberExpression(node: any): any {
   return { type: "Identifier", name: node.name };
 }
 
-export const tsxToTS = (content: string) => {
+export const parseTSX = (content: string) => {
   const comments: Array<{
     type: "Line" | "Block";
     value: string;
@@ -171,6 +208,12 @@ export const tsxToTS = (content: string) => {
         });
       },
     });
+
+  return { root, comments };
+};
+
+export const tsxToTS = (content: string) => {
+  const { root, comments } = parseTSX(content);
 
   const transformedAst = transformJSXElement(root);
   (transformedAst as any).comments = comments;
